@@ -2,6 +2,8 @@
 
 FROM golang:1.16-buster
 
+LABEL org.opencontainers.image.source https://github.com/nmeisenzahl/hijack-kubernetes
+
 WORKDIR /app
 
 ENV CGO_ENABLED=0
