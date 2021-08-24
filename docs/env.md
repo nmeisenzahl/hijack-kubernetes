@@ -49,6 +49,8 @@ az vm create \
   --admin-username azureuser \
   --generate-ssh-keys
 
+az vm open-port --port 80 --resource-group demo-rg --name attack-vm
+
 attackIp=$(az vm show -d -g demo-rg -n attack-vm --query publicIps -o tsv)
 ```
 
