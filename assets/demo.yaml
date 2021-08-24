@@ -1,0 +1,130 @@
+# These deployment files are containing anti-patterns!
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: sample-app
+  name: sample-app
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sample-app
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: sample-app
+    spec:
+      containers:
+      - image: ghcr.io/nmeisenzahl/hijack-kubernetes/sample-app:latest
+        name: sample-app
+        ports:
+        - containerPort: 3000
+        resources: {}
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: sample-app
+  name: sample-app
+  namespace: default
+spec:
+  ports:
+  - name: 80-3000
+    port: 80
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: sample-app
+  type: ClusterIP
+status:
+  loadBalancer: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sample-app
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: addon-http-application-routing
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: sample-app
+            port:
+              number: 80
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: editor
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: edit
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: another-app
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: another-secret
+  namespace: another-app
+type: Opaque
+data:
+  dbString: "YS1yZWFsbHktc2VjcmV0LWRiLWNvbm5lY3Rpb24tc3RyaW5nCg=="
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: another-app
+  name: another-app
+  namespace: another-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: another-app
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: another-app
+    spec:
+      containers:
+      - image: whiteduck/sample-mvc:latest
+        name: another-app
+        env:
+          - name: DB_STRING
+            valueFrom:
+              secretKeyRef:
+                name: another-secret
+                key: dbString
+        ports:
+        - containerPort: 8080
+        resources: {}
+status: {}
