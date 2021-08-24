@@ -11,3 +11,6 @@ Details on how to scaffold the demo environment are available [here](./docs/env.
 ## Hands-on
 
 The hands-on guide is available [here](./docs/hands-on.md).
+
+![Hijack Kubernetes](./docs/hijack-kubernetes.png)
+
