@@ -233,8 +233,6 @@ ctr --address /mnt/containerd.sock --namespace k8s.io container list
 
 </details>
 
----
-
 ## Access secrets from another container
 
 We will now try to retrieve secrets from a container we do not have access to (via Kubernetes):
