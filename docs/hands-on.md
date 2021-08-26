@@ -163,7 +163,7 @@ spec:
       path: /run/containerd
 EOF
 
-kubectl exec -it -n default privileged-pod /bin/bash
+kubectl exec -it -n default privileged-pod -- /bin/bash
 
 apt-get update; apt-get install -y curl jq
 
