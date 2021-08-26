@@ -61,7 +61,7 @@ You will be able to access the VM with `ssh azureuser@$attackIp`.
 Deploy and patch the sample app:
 
 ```bash
-kubectl apply -f https://gitlab.com/nico-meisenzahl/hijack-kubernetes/-/raw/main/assets/demo.yaml
+kubectl apply -f https://raw.githubusercontent.com/nmeisenzahl/hijack-kubernetes/main/assets/demo.yaml
 
 kubectl patch ingress sample-app -p '{"metadata":{"annotations":{"nginx.ingress.kubernetes.io/whitelist-source-range":"'$ip'/32"}}}'
 ```
