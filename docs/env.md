@@ -1,6 +1,6 @@
 # Spin up the environment
 
-This guide is based on Azure and Azure Kubernetes Service but should also work with any other Public Cloud offering.
+This guide is based on Azure and Azure Kubernetes Service, but should be able to be ported to any other public cloud offering.
 
 ## Kubernetes Cluster
 
@@ -38,7 +38,7 @@ az aks get-credentials -n demo-aks -g demo-rg
 
 ## Attacker host
 
-You will also need a host (virtual machine) with a public IP and open port (to connect the reverse shell too). I would recommend spinning up a virtual machine in Azure.
+You also need a host (virtual machine) with a public IP address and an open port (for the reverse shell connection).
 
 ``` bash
 az vm create \
@@ -54,7 +54,7 @@ az vm open-port --port 80 --resource-group demo-rg --name attack-vm
 attackIp=$(az vm show -d -g demo-rg -n attack-vm --query publicIps -o tsv)
 ```
 
-You will be able to access the VM with `ssh azureuser@$attackIp`.
+You will now be able to access the VM with `ssh azureuser@$attackIp`.
 
 ## Sample App
 

