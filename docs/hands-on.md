@@ -128,7 +128,6 @@ kubectl auth can-i create pod
 * Do not enable higher access levels for the default service account (this app would not have needed it!)
 * Review all third-party snippets before deploying them
 * Use read-only filesystems
-* Deny running root containers (Tools like [OPA Gatekeeper](https://github.com/open-policy-agent/gatekeeper) and [Kyverno](https://github.com/kyverno/kyverno) can help)
 * Things we already talked about
   * Limit egress access to the internet
   * Use distroless and secure container images
@@ -225,8 +224,9 @@ ctr --address /mnt/containerd.sock --namespace k8s.io container list
 <details>
 <summary>How to prevent this attack</summary>
 
+* Deny running root containers (Tools like [OPA Gatekeeper](https://github.com/open-policy-agent/gatekeeper) and [Kyverno](https://github.com/kyverno/kyverno) can help)
+* Deny hostPath mounts
 * Things we already talked about
-  * Deny priviledged containers, host path mounts and other security related settings via Policies
   * Do not share service accounts
   * Limit egress access to the internet
   * Use distroless and secure container images
@@ -239,7 +239,7 @@ ctr --address /mnt/containerd.sock --namespace k8s.io container list
 We will now try to retrieve secrets from a container that we do not have access to (via Kubernetes):
 
 ```bash
-id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "13f21f8cb8c85084bc9a3ddf98ecae31de1e5255363bd3a9c9ed50528106676c" | awk '{print $1}')
+id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "docker.io/whiteduck/sample-mvc:latest" | awk '{print $1}')
 
 ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq .Spec.process.env
 ```
@@ -254,7 +254,7 @@ We will use the containerd CLI to access details of a container running on this 
 First we will retrieve the container ID:
 
 ```bash
-id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "13f21f8cb8c85084bc9a3ddf98ecae31de1e5255363bd3a9c9ed50528106676c" | awk '{print $1}')
+id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "docker.io/whiteduck/sample-mvc:latest" | awk '{print $1}')
 ```
 
 And then request container runtime details such as environment variables:
@@ -269,8 +269,9 @@ We could now use the database connection secret to access the database.
 <details>
 <summary>How to prevent this attack</summary>
 
+* Deny running root containers (Tools like [OPA Gatekeeper](https://github.com/open-policy-agent/gatekeeper) and [Kyverno](https://github.com/kyverno/kyverno) can help)
+* Deny hostPath mounts
 * Things we already talked about
-  * Deny priviledged containers, host path mounts and other security related settings via Policies
   * Limit egress access to other cloud resources
   * Use distroless and secure container images
   * Detect untrusted processes with container runtime security
