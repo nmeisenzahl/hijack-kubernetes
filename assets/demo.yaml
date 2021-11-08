@@ -86,15 +86,6 @@ kind: Namespace
 metadata:
   name: another-app
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: another-secret
-  namespace: another-app
-type: Opaque
-data:
-  dbString: "YS1yZWFsbHktc2VjcmV0LWRiLWNvbm5lY3Rpb24tc3RyaW5nCg=="
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -116,15 +107,20 @@ spec:
         app: another-app
     spec:
       containers:
-      - image: whiteduck/sample-mvc:latest
+      - image: nginx:1.21.3
         name: another-app
         env:
-          - name: DB_STRING
+          - name: REDIS_KEY
             valueFrom:
               secretKeyRef:
                 name: another-secret
-                key: dbString
+                key: redisKey
+          - name: REDIS_HOST
+            valueFrom:
+              secretKeyRef:
+                name: another-secret
+                key: redisHost
         ports:
-        - containerPort: 8080
+        - containerPort: 80
         resources: {}
 status: {}

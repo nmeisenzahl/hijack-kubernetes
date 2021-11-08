@@ -7,7 +7,7 @@ This guide is based on Azure and Azure Kubernetes Service, but should be able to
 Create a Resource Group hosting the environment:
 
 ```bash
-az group create --name demo-rg --location westeurope
+az group create --name hijack-demo-rg --location westeurope
 ```
 
 Get your public IP:
@@ -20,8 +20,8 @@ ip=$(curl -s checkip.amazonaws.com)
 Create the Azure Kubernetes Cluster:
 
 ```bash
-az aks create -n demo-aks \
-  -g demo-rg \
+az aks create -n hijack-demo-aks \
+  -g hijack-demo-rg \
   -l westeurope \
   --enable-managed-identity \
   -c 1 \
@@ -33,25 +33,80 @@ az aks create -n demo-aks \
 Configure `kubectl`:
 
 ```bash
-az aks get-credentials -n demo-aks -g demo-rg
+az aks get-credentials -n hijack-demo-aks -g hijack-demo-rg
 ```
 
+Enable Identity:
+
+```bash
+aksId=$(az aks show -g hijack-demo-rg -n hijack-demo-aks --query identityProfile.kubeletidentity.clientId -otsv)
+aksRg=$(az aks show -g hijack-demo-rg -n hijack-demo-aks --query nodeResourceGroup -otsv)
+
+az role assignment create \
+  --role Reader \
+  --assignee $aksId \
+  --resource-group $aksRg
+```
+
+## Redis
+
+Create a Redis instance:
+
+```bash
+az redis create -g hijack-demo-rg \
+  --location westeurope \
+  --name hijack-demo-redis \
+  --sku Basic \
+  --vm-size c0 \
+  --enable-non-ssl-port
+```
+
+Define firewall rules:
+
+```bash
+aksOutboundId=$(az aks show -g hijack-demo-rg -n hijack-demo-aks --query 'networkProfile.loadBalancerProfile.effectiveOutboundIPs[].{id:id}' -otsv)
+
+aksOutboundIp=$(az network public-ip show --ids $aksOutboundId --query ipAddress -otsv)
+
+az redis firewall-rules create -g hijack-demo-rg \
+  --name hijack-demo-redis \
+  --rule-name aks0access \
+  --start-ip $aksOutboundIp \
+  --end-ip $aksOutboundIp
+
+az redis firewall-rules create -g hijack-demo-rg \
+  --name hijack-demo-redis \
+  --rule-name client0access \
+  --start-ip $ip \
+  --end-ip $ip
+```
+
+Add data:
+
+```bash
+RedisKey=$(az redis list-keys -g hijack-demo-rg --name hijack-demo-redis --query primaryKey -otsv)
+RedisHost=$(az redis show -g hijack-demo-rg --name hijack-demo-redis --query hostName -otsv)
+
+redis-cli -h $RedisHost -a $RedisKey set data "some secret data"
+```
 ## Attacker host
 
 You also need a host (virtual machine) with a public IP address and an open port (for the reverse shell connection).
 
 ``` bash
 az vm create \
-  --resource-group demo-rg \
+  --resource-group hijack-demo-rg \
   -l westeurope \
-  --name attack-vm \
+  --name hijack-attack-vm \
   --image UbuntuLTS \
   --admin-username azureuser \
-  --generate-ssh-keys
+  --generate-ssh-keys \
+  --public-ip-sku Standard \
+  --public-ip-address-allocation static
 
-az vm open-port --port 80 --resource-group demo-rg --name attack-vm
+az vm open-port --port 80 --resource-group hijack-demo-rg --name hijack-attack-vm
 
-attackIp=$(az vm show -d -g demo-rg -n attack-vm --query publicIps -o tsv)
+attackIp=$(az vm show -d -g hijack-demo-rg -n hijack-attack-vm --query publicIps -o tsv)
 ```
 
 You will now be able to access the VM with `ssh azureuser@$attackIp`.
@@ -64,4 +119,16 @@ Deploy and patch the sample app:
 kubectl apply -f https://raw.githubusercontent.com/nmeisenzahl/hijack-kubernetes/main/assets/demo.yaml
 
 kubectl patch ingress sample-app -p '{"metadata":{"annotations":{"nginx.ingress.kubernetes.io/whitelist-source-range":"'$ip'/32"}}}'
+
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: another-secret
+  namespace: another-app
+type: Opaque
+data:
+  redisHost: "$(echo $RedisHost | base64)"
+  redisKey: "$(echo $RedisKey | base64)"
+EOF
 ```
