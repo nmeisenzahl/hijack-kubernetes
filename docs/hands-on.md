@@ -1,6 +1,8 @@
 # Hijack Kubernetes Hands-on
-
 ## Play with the sample app
+
+<details>
+<summary>Show me the details</summary>
 
 The sample application "ping me" pings a target specified via the input field. Try the following inputs:
 
@@ -27,8 +29,12 @@ The sample application "ping me" pings a target specified via the input field. T
 * Build secure/small container images ([distroless](https://github.com/GoogleContainerTools/distroless), less is more)
 
 </details>
+</details>
 
 ## Hijack the container
+
+<details>
+<summary>Show me the details</summary>
 
 We now inject into the container via a reverse shell. Try to execute the following snippets:
 
@@ -61,8 +67,12 @@ Input for the app (change your IP):
 * Detect untrusted process with container runtime security tools like [Falco](https://github.com/falcosecurity/falco)
 
 </details>
+</details>
 
 ## Get access to the Kubernetes API
+
+<details>
+<summary>Show me the details</summary>
 
 Let's see if we can access the API server. Execute the following snippets:
 
@@ -134,8 +144,12 @@ kubectl auth can-i create pod
   * Detect untrusted processes with container runtime security
 
 </details>
+</details>
 
 ## Hijack the Kubernetes Node
+
+<details>
+<summary>Show me the details</summary>
 
 Let's try one more thing. Are we able to schedule a privileged pod and "talk" to containerd? Run the following snippets:
 
@@ -233,8 +247,12 @@ ctr --address /mnt/containerd.sock --namespace k8s.io container list
   * Detect untrusted processes with container runtime security
 
 </details>
+</details>
 
 ## Access secrets and data from another container
+
+<details>
+<summary>Show me the details</summary>
 
 We will now try to retrieve secrets from a container that we do not have access to (via Kubernetes):
 
@@ -288,16 +306,21 @@ redis-cli -h $REDIS_HOST -a $REDIS_KEY get data
 <details>
 <summary>How to prevent this attack</summary>
 
-* Deny running root containers (Tools like [OPA Gatekeeper](https://github.com/open-policy-agent/gatekeeper) and [Kyverno](https://github.com/kyverno/kyverno) can help)
-* Deny hostPath mounts
+* Limit egress access to other cloud resources (Network policies)
+* Secure your other cloud resources
 * Things we already talked about
-  * Limit egress access to other cloud resources
   * Use distroless and secure container images
   * Detect untrusted processes with container runtime security
+  * Deny running root containers (Tools like OPA Gatekeeper and Kyverno can help)
+  * Deny hostPath mounts
 
+</details>
 </details>
 
 ## Hijack Cloud resources
+
+<details>
+<summary>Show me the details</summary>
 
 We can also use the underlying cloud identity and try to escape even further. Run the following snippet to get a valid cloud provider token (in our case the Client ID of the underlying Managed Identity):
 
@@ -353,4 +376,5 @@ We could now use the secret to talk to the cloud provider management plane (in o
   * Use distroless and secure container images
   * Detect untrusted processes with container runtime security
 
+</details>
 </details>
