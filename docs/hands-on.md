@@ -63,6 +63,7 @@ Input for the app (change your IP):
 <summary>How to prevent this attack</summary>
 
 * Build secure/small container images ([distroless](https://github.com/GoogleContainerTools/distroless), less is more)
+* Do not run workload as root
 * Deny egress network access on a network level as well as using [Kubernetes Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 * Detect untrusted process with container runtime security tools like [Falco](https://github.com/falcosecurity/falco)
 
