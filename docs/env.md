@@ -14,7 +14,6 @@ Get your public IP:
 
 ```bash
 ip=$(curl -s checkip.amazonaws.com)
-
 ```
 
 Create the Azure Kubernetes Cluster:
@@ -43,7 +42,7 @@ aksId=$(az aks show -g hijack-demo-rg -n hijack-demo-aks --query identityProfile
 aksRg=$(az aks show -g hijack-demo-rg -n hijack-demo-aks --query nodeResourceGroup -otsv)
 
 az role assignment create \
-  --role Reader \
+  --role Contributor \
   --assignee $aksId \
   --resource-group $aksRg
 ```
@@ -131,4 +130,24 @@ data:
   redisHost: "$(echo $RedisHost | base64)"
   redisKey: "$(echo $RedisKey | base64)"
 EOF
+```
+
+# Update Source IP
+
+The below steps are only needed when your source IP had changed.
+
+```bash
+ip=$(curl -s checkip.amazonaws.com)
+
+az redis firewall-rules create -g hijack-demo-rg \
+  --name hijack-demo-redis \
+  --rule-name client0access0$RANDOM \
+  --start-ip $ip \
+  --end-ip $ip
+
+az aks update -n hijack-demo-aks \
+  -g hijack-demo-rg \
+  --api-server-authorized-ip-ranges $ip
+
+kubectl patch ingress sample-app -p '{"metadata":{"annotations":{"nginx.ingress.kubernetes.io/whitelist-source-range":"'$ip'/32"}}}'
 ```
