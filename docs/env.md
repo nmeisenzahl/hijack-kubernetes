@@ -103,12 +103,21 @@ az vm create \
   --public-ip-sku Standard \
   --public-ip-address-allocation static
 
-az vm open-port --port 80 --resource-group hijack-demo-rg --name hijack-attack-vm
+az vm open-port --port 80,443,1389 --resource-group hijack-demo-rg --name hijack-attack-vm
 
 attackIp=$(az vm show -d -g hijack-demo-rg -n hijack-attack-vm --query publicIps -o tsv)
+
+ssh azureuser@$attackIp 'curl -s https://raw.githubusercontent.com/nmeisenzahl/hijack-kubernetes/assets/configure-vm.sh | bash'
 ```
 
-You will now be able to access the VM with `ssh azureuser@$attackIp`.
+You now need to download Orca Java and install it on the attacker host. To do so you will have to visit [this](https://www.oracle.com/java/technologies/javase/javase8-archive-downloads.html) URL and download the JDK version "8u201" onto your local machine. Then execute the following commands to configure the attacker machine:
+
+```bash
+scp jdk-8u201-linux-x64.tar.gz azureuser@$attackIp:/home/azureuser/log4j-shell-poc/
+
+ssh azureuser@$attackIp 'tar -xvf /home/azureuser/log4j-shell-poc/jdk-8u201-linux-x64.tar.gz --directory ./log4j-shell-poc'
+ssh azureuser@$attackIp 'mv /home/azureuser/log4j-shell-poc/jdk1.8.0_201 /home/azureuser/log4j-shell-poc/jdk1.8.0_20'
+```
 
 ## Sample App
 
