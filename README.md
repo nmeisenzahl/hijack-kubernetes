@@ -16,4 +16,4 @@ The hands-on guide is available [here](./docs/hands-on.md).
 
 ## Slides
 
-My slides with further details and learnings are available [here](./docs/hijack-kubernetes.pdf).
+The corresponding slides with further details and learnings are available [here](./docs/hijack-kubernetes.pdf).
